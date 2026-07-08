@@ -554,10 +554,10 @@ Code Sanitization:
 
 ### 6.1 Current Limitations
 
-1. **LLM Integration Missing**
-   - Current: Hardcoded heuristics for test planning
-   - Limitation: Doesn't learn from feedback
-   - Future: Add Semantic Kernel LLM calls
+1. **LLM Response Reliability & Schema Robustness**
+  - Current: Live chat-completions integration is implemented for planning, generation, and triage
+  - Limitation: Provider responses can still drift from strict JSON schema
+  - Future: Add stricter schema validation, auto-repair, and response contract tests
 
 2. **Test Execution Simulated**
    - Current: Deterministic outcomes based on test type
@@ -581,10 +581,10 @@ Code Sanitization:
 
 ### 6.2 Next Steps (Priority Order)
 
-1. **Phase 1: LLM Integration** (2 weeks)
-   - Replace heuristics with Semantic Kernel LLM calls
-   - Fine-tune prompts for QE domain
-   - Add prompt versioning
+1. **Phase 1: LLM Hardening** (2 weeks)
+  - Add strict JSON schema validators for all LLM stages
+  - Introduce prompt versioning and output contract tests
+  - Add retry/backoff and provider fallback strategy
 
 2. **Phase 2: Real Test Execution** (3 weeks)
    - Docker container for test isolation
@@ -616,7 +616,7 @@ This QE Agent System demonstrates that intelligent automation can successfully t
 ✅ **Safety:** Multi-layer defense against injection and code execution attacks  
 ✅ **Quality:** Risk-based thinking, meaningful negative tests, realistic triage  
 ✅ **Trustworthiness:** Clear reasoning, confidence scores, flakiness detection  
-✅ **Extensibility:** Modular design ready for LLM integration and scaling  
+✅ **Extensibility:** Modular design with live LLM invocation, ready for scaling and enterprise hardening  
 
 **Key Insight:** The real value of agentic AI in QE isn't replacing testers—it's augmenting them. By automating the mechanical parts (code generation, clustering), agents free experts to focus on strategy (what to test, how to improve coverage).
 
