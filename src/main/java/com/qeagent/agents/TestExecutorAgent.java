@@ -27,8 +27,9 @@ public class TestExecutorAgent {
         List<Future<?>> futures = new ArrayList<>();
 
         for (GeneratedTest test : tests) {
-            // Only execute sanitized tests
-            if (GeneratedTest.SanitizationStatus.SANITIZED != test.getSanitizationStatus()) {
+            // Execute tests that passed sanitization/approval checks
+            if (GeneratedTest.SanitizationStatus.SANITIZED != test.getSanitizationStatus()
+                && GeneratedTest.SanitizationStatus.APPROVED != test.getSanitizationStatus()) {
                 logger.warn("Skipping non-sanitized test: {}", test.getTestId());
                 TestExecutionResult errorResult = new TestExecutionResult(
                     UUID.randomUUID().toString(),

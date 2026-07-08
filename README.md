@@ -27,6 +27,33 @@ java -cp target/qe-agent-system.jar com.qeagent.Main
 
 **Output:** Complete workflow execution with test plan, generated tests, execution results, and defect triage.
 
+### LLM Configuration (Real Invocation)
+
+The agent stages now invoke a real chat-completions API via environment variables.
+
+Required/optional variables:
+
+- `QE_LLM_API_KEY`
+  - Default: `DUMMY_API_KEY`
+  - Replace with a real key to enable live model output.
+- `QE_LLM_MODEL`
+  - Default: `openai/gpt-4o-mini`
+- `QE_LLM_BASE_URL`
+  - Default: `https://openrouter.ai/api/v1/chat/completions`
+
+PowerShell example:
+
+```powershell
+$env:QE_LLM_API_KEY = "DUMMY_API_KEY"
+$env:QE_LLM_MODEL = "openai/gpt-4o-mini"
+$env:QE_LLM_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+java -cp target/qe-agent-system.jar com.qeagent.Main
+```
+
+Notes:
+- With `DUMMY_API_KEY`, the system still runs using deterministic fallback payloads.
+- With a real key, planning/generation/triage agents call the configured LLM endpoint directly.
+
 ---
 
 ## 📋 System Architecture
