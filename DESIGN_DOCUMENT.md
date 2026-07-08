@@ -589,10 +589,10 @@ Code Sanitization:
    - Limitation: Doesn't run against real system
    - Future: Docker-based test containers + real SUT
 
-3. **No Human-in-the-Loop UI**
-   - Current: Console output only
-   - Limitation: Hard to review/modify test plans
-   - Future: Web dashboard for review & approval
+3. **Human-in-the-Loop UX is CLI/Env Driven (No Review Dashboard Yet)**
+  - Current: Human-in-the-loop checkpoints are implemented in orchestration (`POST_PLANNING`, `POST_TRIAGE`) with `advisory` and `enforced` modes
+  - Limitation: Approval flow is environment-driven rather than an interactive review dashboard
+  - Future: Web dashboard for reviewer decisions, audit timeline, and one-click approve/reject
 
 4. **Single Language Support**
    - Current: TestNG Java only
