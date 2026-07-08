@@ -9,9 +9,9 @@
 
 ## Executive Summary
 
-This document describes the design, implementation, and evaluation of an AI-powered Quality Engineering (QE) agent system that automates the complete testing lifecycle: artifact analysis → test planning → test generation → execution → defect triage. The system is built using **Microsoft Semantic Kernel** (Java) and demonstrates production-quality engineering practices including sandboxed execution, injection prevention, and human-in-the-loop decision points.
+This document describes the design, implementation, and evaluation of an AI-powered Quality Engineering (QE) agent system that automates the complete testing lifecycle: artifact analysis -> test planning -> test generation -> execution -> defect triage. The system is built in Java and uses real chat-completions LLM invocation for planning, generation, and triage stages, with deterministic fallback mode when secrets or provider access are unavailable.
 
-**Key Achievement:** End-to-end workflow demonstrating all 4 QE stages with realistic defect triage accuracy and flakiness detection.
+**Key Achievement:** End-to-end workflow demonstrating all 4 QE stages with real LLM-backed reasoning and resilient fallback execution.
 
 ---
 
@@ -95,6 +95,20 @@ private List<TestExecutionResult> executeTests(...)
 private List<Defect> triageFailures(...)
 ```
 
+#### BaseAgent (Shared LLM Invocation Layer)
+**Role:** Provider-agnostic chat-completions invocation and fallback handling.
+
+**Responsibilities:**
+- Build and send structured prompts to configured LLM endpoint
+- Parse chat-completions payloads from provider response
+- Normalize model output (including code-fence stripping)
+- Apply deterministic local fallback when running with dummy key or API failure
+
+**Environment variables:**
+- `QE_LLM_API_KEY` (default: `DUMMY_API_KEY`)
+- `QE_LLM_MODEL` (default: `openai/gpt-4o-mini`)
+- `QE_LLM_BASE_URL` (default: `https://openrouter.ai/api/v1/chat/completions`)
+
 #### TestPlannerAgent (Stage 1)
 **Role:** Analyze artifacts and create risk-based test plans  
 **Input:** Raw PRD/spec content  
@@ -102,24 +116,19 @@ private List<Defect> triageFailures(...)
 
 **Algorithm:**
 ```
-1. Parse artifact for features, requirements, keywords
-2. Identify risk areas:
-   - Payment, auth, API contracts → CRITICAL
-   - Performance, integration → HIGH
-   - Data validation → MEDIUM
-3. Generate test scenarios:
-   - Happy path (for each feature)
-   - Boundary tests (empty, null, max length)
-   - Negative tests (invalid input, error conditions)
-   - Security tests (injection, unauthorized access)
-4. Define coverage areas and traceability
-5. Flag ambiguities in spec (TODO, TBD, missing details)
-6. Calculate test data requirements
+1. Build planner system prompt with strict JSON target schema
+2. Send artifact type + content to LLM via BaseAgent
+3. Parse risk, scenario, coverage, ambiguity, and criteria fields
+4. Hydrate Java model objects from returned JSON
+5. Fallback to deterministic planning JSON if invocation/parsing fails
 ```
 
-**Design Decision:** Use heuristic keyword matching instead of LLM  
-**Rationale:** Deterministic + fast; can add LLM fine-tuning later  
-**Alternative:** Full LLM-based analysis (would require API key + cost)
+**Design Decision:** Use real LLM invocation with deterministic fallback.
+
+**Rationale:**
+- Improves risk reasoning and ambiguity detection quality
+- Keeps demo and local runs reliable with no mandatory secret dependency
+- Maintains provider portability using configurable endpoint/model
 
 #### TestGeneratorAgent (Stage 2)
 **Role:** Convert test scenarios into executable code  
@@ -128,19 +137,16 @@ private List<Defect> triageFailures(...)
 
 **Algorithm:**
 ```
-1. For each test scenario:
-   a. Generate class name from scenario title
-   b. Create TestNG test method with @Test annotation
-   c. Embed test data as local variables
-   d. Populate preconditions, steps, assertions
-2. Perform security checks:
+1. For each scenario, prompt LLM to generate test metadata + Java TestNG source
+2. Parse class name, source code, tags, timeout, retry, and test data
+3. Perform security checks:
    - Regex patterns for Runtime.exec, ProcessBuilder, etc.
    - Hardcoded credential detection
    - SQL injection patterns
    - Reflection usage
-3. Sanitize code for injection attacks
-4. Validate Java syntax (brace matching, etc.)
-5. Mark as SANITIZED, APPROVED, or REJECTED
+4. Sanitize code for injection attacks and validate generated output
+5. Mark as SANITIZED or REJECTED
+6. Fallback to deterministic generated test when LLM output is invalid
 ```
 
 **Security Checks (4 layers):**
@@ -185,28 +191,11 @@ private List<Defect> triageFailures(...)
 **Algorithm:**
 ```
 1. Filter to failures (FAILED, ERROR, TIMEOUT)
-2. Cluster similar failures:
-   - Extract error message pattern
-   - Normalize: replace numbers with 'X'
-   - Group by pattern → cluster key
-3. For each cluster:
-   a. Determine severity:
-      - NullPointerException → CRITICAL
-      - Timeout/Hang → HIGH
-      - Assertion fail → HIGH/MEDIUM
-   b. Analyze root cause:
-      - Parse stack trace
-      - Suggest likely components
-      - Recommend investigation
-   c. Calculate confidence (0.0-1.0):
-      - More failures in cluster → higher confidence
-      - Clear stack traces → higher confidence
-      - RCA certainty → higher confidence
-   d. Assign priority based on count & severity
-4. Deduplicate:
-   - Find similar defects
-   - Mark as duplicates
-   - Link to primary defect
+2. Send sampled failures + risk context to LLM triage prompt
+3. Parse defects with severity, priority, hypothesis, components, confidence
+4. Hydrate Defect + RootCauseAnalysis model fields
+5. Deduplicate by normalized defect titles
+6. Fallback to deterministic triage payload on parse/invocation failure
 ```
 
 **Defect Scoring:**
@@ -287,28 +276,19 @@ Confidence Calculation:
 
 ## 3. Framework & Technology Choices
 
-### 3.1 Why Microsoft Semantic Kernel (Java)?
+### 3.1 Why Real Chat-Completions Invocation?
 
-| Criterion | SK Java | Alternative | Why SK Wins |
-|-----------|---------|-------------|------------|
-| **Native Java Support** | ✓ First-class | LangChain (Python), AutoGen (multi-lang) | Direct Java integration, no IPC |
-| **Plugin Architecture** | ✓ Built-in | Custom framework | SK's plugin system = agent patterns |
-| **LLM Flexibility** | ✓ OpenAI, Azure, local | Single-vendor lock-in | Future-proof for model swaps |
-| **Type Safety** | ✓ Compiled | Dynamic languages | Catch injection issues at build time |
-| **Enterprise Ready** | ✓ Used by Microsoft | Startup tools | Battle-tested, good support |
-| **Testing Integration** | ✓ TestNG/JUnit compatible | Web frameworks | Test-specific framework |
+| Criterion | Chosen Approach | Alternative | Why Chosen |
+|-----------|------------------|-------------|------------|
+| Provider flexibility | Generic chat-completions HTTP | Framework-specific wrappers | Easy model/provider swap via env config |
+| Java integration | OkHttp + Jackson | External bridge service | Lower runtime complexity |
+| Reliability | Deterministic fallback mode | Hard-fail on API outage | Better demo/CI resilience |
+| Prompt control | Explicit stage prompts | Hidden templates | Transparent and tunable QE behavior |
+| Security layering | Existing detector + sanitizer | LLM-only protections | Defense in depth |
 
-**Future Migration Path:**
-If LLM integration is added later:
-```java
-// Current: Heuristic-based
-TestPlan plan = plannerAgent.generateTestPlan(artifact);
-
-// Future: LLM-powered (drop-in replacement)
-var kernel = new Kernel(openAIClient);
-var llmPlanner = new SemanticKernelPlanner(kernel);
-TestPlan plan = llmPlanner.generateTestPlan(artifact);
-```
+**Runtime Modes:**
+- Live mode: LLM calls enabled when `QE_LLM_API_KEY` is non-dummy
+- Safe demo mode: deterministic fallback when key is dummy/missing or provider fails
 
 ### 3.2 Why Java?
 

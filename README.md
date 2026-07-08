@@ -54,6 +54,25 @@ Notes:
 - With `DUMMY_API_KEY`, the system still runs using deterministic fallback payloads.
 - With a real key, planning/generation/triage agents call the configured LLM endpoint directly.
 
+### Real LLM Invocation by Stage
+
+- Stage 1 (`TestPlannerAgent`): Sends artifact content to LLM and parses JSON into `TestPlan`.
+- Stage 2 (`TestGeneratorAgent`): Sends each scenario to LLM and parses generated Java/TestNG test code + test data.
+- Stage 3 (`TestExecutorAgent`): Executes only tests that passed sanitization/approval checks.
+- Stage 4 (`DefectTriageAgent`): Sends failures to LLM and parses actionable defects with severity/priority/root-cause hints.
+
+If any LLM call fails or returns invalid JSON, the stage falls back to deterministic local generation so end-to-end workflow still completes.
+
+### Example: Real Key Configuration
+
+```powershell
+$env:QE_LLM_API_KEY = "<your-real-provider-key>"
+$env:QE_LLM_MODEL = "openai/gpt-4o-mini"
+$env:QE_LLM_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+mvn clean package
+java -cp target/qe-agent-system.jar com.qeagent.Main
+```
+
 ---
 
 ## 📋 System Architecture
