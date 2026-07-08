@@ -616,10 +616,10 @@ Code Sanitization:
    - Real TestNG compilation & execution
    - Connect to sample microservice
 
-3. **Phase 3: Human-in-the-Loop** (2 weeks)
-   - Web UI for test plan review
-   - Defect triage dashboard
-   - Feedback loop for prompt improvement
+3. **Phase 3: Human-in-the-Loop UX & Governance Hardening** (2 weeks)
+  - Add reviewer dashboard for plan/triage approvals on top of existing orchestrator checkpoints
+  - Add decision audit timeline and reviewer attribution for compliance
+  - Add feedback loop to tune prompts based on approved/rejected decisions
 
 4. **Phase 4: Multi-Language** (3 weeks)
    - Python test generation (pytest)
