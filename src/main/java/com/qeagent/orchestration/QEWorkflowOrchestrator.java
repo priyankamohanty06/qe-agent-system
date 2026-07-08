@@ -18,6 +18,8 @@ import java.util.*;
  */
 public class QEWorkflowOrchestrator {
     private static final Logger logger = LoggerFactory.getLogger(QEWorkflowOrchestrator.class);
+    private static final String HITL_MODE_ENV = "QE_HITL_MODE";
+    private static final String HITL_APPROVAL_ENV = "QE_HITL_APPROVAL_TOKEN";
     
     private final TestPlannerAgent plannerAgent;
     private final TestGeneratorAgent generatorAgent;
@@ -25,6 +27,8 @@ public class QEWorkflowOrchestrator {
     private final DefectTriageAgent triageAgent;
     private final PromptInjectionDetector injectionDetector;
     private final CodeSanitizer codeSanitizer;
+    private final String hitlMode;
+    private final String hitlApprovalToken;
 
     public QEWorkflowOrchestrator() {
         this.plannerAgent = new TestPlannerAgent();
@@ -33,6 +37,8 @@ public class QEWorkflowOrchestrator {
         this.triageAgent = new DefectTriageAgent();
         this.injectionDetector = new PromptInjectionDetector();
         this.codeSanitizer = new CodeSanitizer();
+        this.hitlMode = readEnvOrDefault(HITL_MODE_ENV, "advisory").toLowerCase(Locale.ROOT);
+        this.hitlApprovalToken = readEnvOrDefault(HITL_APPROVAL_ENV, "");
     }
 
     /**
@@ -65,6 +71,19 @@ public class QEWorkflowOrchestrator {
             }
             context.setTestPlan(testPlan);
 
+            if (!humanReviewCheckpoint(
+                context,
+                "POST_PLANNING",
+                String.format("Plan=%s, Scenarios=%d, Ambiguities=%d",
+                    testPlan.getPlanId(),
+                    testPlan.getTestScenarios().size(),
+                    testPlan.getAmbiguities().size())
+            )) {
+                context.setStatus(ExecutionContext.WorkflowStatus.FAILED);
+                context.addError("Human review gate failed at POST_PLANNING");
+                return context;
+            }
+
             // Stage 2: Test Generation
             logger.info("Stage 2: Test Generation");
             context.setStatus(ExecutionContext.WorkflowStatus.GENERATING);
@@ -87,6 +106,20 @@ public class QEWorkflowOrchestrator {
             context.setStatus(ExecutionContext.WorkflowStatus.TRIAGING);
             List<Defect> defects = triageFailures(context, results, testPlan);
             context.setTriageDefects(defects);
+
+            if (!humanReviewCheckpoint(
+                context,
+                "POST_TRIAGE",
+                String.format("Defects=%d, FailedTests=%d",
+                    defects.size(),
+                    (int) results.stream().filter(r -> TestExecutionResult.ExecutionStatus.FAILED == r.getStatus()
+                        || TestExecutionResult.ExecutionStatus.ERROR == r.getStatus()
+                        || TestExecutionResult.ExecutionStatus.TIMEOUT == r.getStatus()).count())
+            )) {
+                context.setStatus(ExecutionContext.WorkflowStatus.FAILED);
+                context.addError("Human review gate failed at POST_TRIAGE");
+                return context;
+            }
 
             // Workflow complete
             context.setStatus(ExecutionContext.WorkflowStatus.COMPLETED);
@@ -251,5 +284,34 @@ public class QEWorkflowOrchestrator {
             context.addError("Defect Triaging: " + e.getMessage());
             return new ArrayList<>();
         }
+    }
+
+    private boolean humanReviewCheckpoint(ExecutionContext context, String checkpoint, String summary) {
+        String keyPrefix = "hitl." + checkpoint.toLowerCase(Locale.ROOT);
+        context.getMetadata().put(keyPrefix + ".mode", hitlMode);
+        context.getMetadata().put(keyPrefix + ".summary", summary);
+
+        if (!"enforced".equals(hitlMode)) {
+            logger.info("HITL [{}] advisory: {}", checkpoint, summary);
+            context.getMetadata().put(keyPrefix + ".decision", "ADVISORY_AUTO_CONTINUE");
+            return true;
+        }
+
+        boolean approved = "APPROVED".equalsIgnoreCase(hitlApprovalToken);
+        if (approved) {
+            logger.info("HITL [{}] enforced: approval token accepted", checkpoint);
+            context.getMetadata().put(keyPrefix + ".decision", "APPROVED");
+            return true;
+        }
+
+        logger.warn("HITL [{}] enforced: approval token missing/invalid", checkpoint);
+        context.getMetadata().put(keyPrefix + ".decision", "REJECTED");
+        context.addError("HITL enforcement active. Set QE_HITL_APPROVAL_TOKEN=APPROVED to proceed.");
+        return false;
+    }
+
+    private String readEnvOrDefault(String key, String fallback) {
+        String value = System.getenv(key);
+        return value == null || value.isBlank() ? fallback : value;
     }
 }

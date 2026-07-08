@@ -82,6 +82,7 @@ Quality Engineering is a high-leverage place to apply agentic AI:
 - Invoke agents in sequence (Stage 1 → 2 → 3 → 4)
 - Manage ExecutionContext throughout workflow
 - Enforce security gates (pre-flight checks)
+- Apply human-in-the-loop checkpoints at critical decision stages
 - Handle errors gracefully with fallbacks
 - Coordinate cleanup (thread pool shutdown, etc.)
 
@@ -93,7 +94,16 @@ private TestPlan executeTestPlanning(...)
 private List<GeneratedTest> executeTestGeneration(...)
 private List<TestExecutionResult> executeTests(...)
 private List<Defect> triageFailures(...)
+private boolean humanReviewCheckpoint(...)
 ```
+
+**Human-in-the-Loop Checkpoints:**
+- `POST_PLANNING`: review risk plan quality and ambiguities before generation/execution
+- `POST_TRIAGE`: review defect output before final workflow completion
+
+**Modes:**
+- `advisory` (default): logs checkpoint and proceeds automatically
+- `enforced`: requires `QE_HITL_APPROVAL_TOKEN=APPROVED`, otherwise workflow stops
 
 #### BaseAgent (Shared LLM Invocation Layer)
 **Role:** Provider-agnostic chat-completions invocation and fallback handling.
@@ -439,6 +449,21 @@ future.get(30, TimeUnit.SECONDS);
 // If exceeds: TimeoutException → mark as TIMEOUT
 // If hangs: cancel() called → InterruptedException
 ```
+
+### 4.5 Human-in-the-Loop Safety Gate
+
+To prevent silent promotion of low-confidence outputs, the orchestrator adds explicit review gates.
+
+```java
+QE_HITL_MODE=advisory|enforced
+QE_HITL_APPROVAL_TOKEN=APPROVED
+```
+
+Behavior:
+- Advisory mode: records decision metadata and continues
+- Enforced mode: halts workflow unless explicit approval token is present
+
+All checkpoint outcomes are captured in `ExecutionContext.metadata` for auditability.
 
 ---
 

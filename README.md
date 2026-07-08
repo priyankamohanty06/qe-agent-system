@@ -73,6 +73,33 @@ mvn clean package
 java -cp target/qe-agent-system.jar com.qeagent.Main
 ```
 
+### Human-in-the-Loop (HITL) Controls
+
+The orchestrator now supports explicit human-review checkpoints where it makes sense:
+
+- `POST_PLANNING`: review generated plan, scenario count, and ambiguities
+- `POST_TRIAGE`: review defect summary before final completion
+
+Configuration:
+
+- `QE_HITL_MODE`
+  - `advisory` (default): records checkpoint metadata and continues
+  - `enforced`: requires explicit approval token or workflow stops
+- `QE_HITL_APPROVAL_TOKEN`
+  - Set to `APPROVED` when `QE_HITL_MODE=enforced` to continue
+
+PowerShell example:
+
+```powershell
+$env:QE_HITL_MODE = "enforced"
+$env:QE_HITL_APPROVAL_TOKEN = "APPROVED"
+java -cp target/qe-agent-system.jar com.qeagent.Main
+```
+
+Checkpoint decisions are persisted in `ExecutionContext.metadata` under keys like:
+- `hitl.post_planning.*`
+- `hitl.post_triage.*`
+
 ---
 
 ## 📋 System Architecture
