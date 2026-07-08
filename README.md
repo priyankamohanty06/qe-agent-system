@@ -619,14 +619,4 @@ Files:
 
 ---
 
-## 📄 License
 
-MIT License - See LICENSE file
-
----
-
-## ✉️ Contact
-
-For questions or feedback on this QE agent system, please open an issue on GitHub.
-
-**Happy Testing! 🚀**
