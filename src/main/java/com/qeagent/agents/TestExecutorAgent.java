@@ -176,25 +176,34 @@ public class TestExecutorAgent {
      * Simulates realistic test outcomes including flakiness.
      */
     private boolean shouldTestFail(Map<String, Object> testData, int attemptNumber) {
-        String testType = (String) testData.get("scenario_type");
+        String testType = String.valueOf(testData.getOrDefault("scenario_type", "GENERAL"));
+        String expectedOutcome = String.valueOf(testData.getOrDefault("expected_outcome", "SUCCESS"));
+        boolean forceFailure = Boolean.parseBoolean(String.valueOf(testData.getOrDefault("force_failure", false)));
 
-        // Happy path tests usually pass
-        if ("HAPPY_PATH".equals(testType)) {
-            return random.nextDouble() < 0.1; // 10% failure rate (flakiness)
+        if (forceFailure) {
+            return true;
         }
 
-        // Boundary tests have moderate failure rate
-        if ("BOUNDARY".equals(testType)) {
-            return random.nextDouble() < 0.3; // 30% failure rate
+        int seed = Math.abs(Objects.hash(testData.get("scenario_id"), testType));
+        int bucket = seed % 10;
+
+        if ("HAPPY_PATH".equalsIgnoreCase(testType)) {
+            return bucket == 0 && attemptNumber == 0;
+        }
+        if ("BOUNDARY".equalsIgnoreCase(testType)) {
+            return bucket <= 3 && attemptNumber == 0;
+        }
+        if ("SECURITY".equalsIgnoreCase(testType)) {
+            return true;
+        }
+        if ("NEGATIVE".equalsIgnoreCase(testType)) {
+            if ("SUCCESS".equalsIgnoreCase(expectedOutcome)) {
+                return true;
+            }
+            return bucket <= 4;
         }
 
-        // Negative tests often fail (as expected to show the feature works)
-        if ("NEGATIVE".equals(testType)) {
-            return random.nextDouble() < 0.5; // 50% failure rate
-        }
-
-        // Default: randomly fail
-        return random.nextDouble() < 0.2;
+        return bucket <= 1 && attemptNumber == 0;
     }
 
     private String generateMockStackTrace(GeneratedTest test) {

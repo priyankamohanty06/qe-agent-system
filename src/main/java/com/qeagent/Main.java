@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.qeagent.models.*;
 import com.qeagent.orchestration.QEWorkflowOrchestrator;
+import com.qeagent.server.QEBackendServer;
 import java.util.*;
 import java.io.*;
 
@@ -25,6 +26,23 @@ public class Main {
         .enable(SerializationFeature.INDENT_OUTPUT);
 
     public static void main(String[] args) throws Exception {
+        if (args != null && args.length > 0 && ("--server".equalsIgnoreCase(args[0]) || "server".equalsIgnoreCase(args[0]))) {
+            int port = 8081;
+            if (args.length > 1) {
+                try {
+                    port = Integer.parseInt(args[1]);
+                } catch (NumberFormatException ignore) {
+                    logger.warn("Invalid port '{}', using default 8081", args[1]);
+                }
+            }
+
+            QEBackendServer backendServer = new QEBackendServer(port);
+            backendServer.start();
+            System.out.printf("QE backend server is running on http://127.0.0.1:%d\n", port);
+            Thread.currentThread().join();
+            return;
+        }
+
         System.out.println("\n" +
             "╔════════════════════════════════════════════════════════════════╗\n" +
             "║         AI-Powered QE Agent System - End-to-End Demo          ║\n" +
@@ -68,7 +86,8 @@ public class Main {
      * Loads a sample PRD artifact for demonstration
      */
     private static String loadSamplePRD() {
-        return """PRODUCT REQUIREMENT DOCUMENT (PRD)
+        return """
+    PRODUCT REQUIREMENT DOCUMENT (PRD)
 ==========================================
 Product: User Authentication API v2.0
 Version: 1.0

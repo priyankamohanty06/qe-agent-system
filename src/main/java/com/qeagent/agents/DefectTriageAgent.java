@@ -8,8 +8,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -62,20 +65,32 @@ public class DefectTriageAgent extends BaseAgent {
             }
 
             for (JsonNode node : arr) {
+                String title = node.path("title").asText("Execution failure cluster");
+                String hypothesis = node.path("hypothesis").asText("Potential application defect in failure path");
+                String investigation = node.path("recommendedInvestigation").asText("Inspect logs and API contract mismatches");
+                String category = inferCategoryFromText(title + " " + hypothesis + " " + investigation);
+
                 Defect defect = new Defect("DEF-" + UUID.randomUUID().toString().substring(0, 8),
-                    node.path("title").asText("Execution failure cluster"),
+                    title,
                     parseSeverity(node.path("severity").asText("HIGH")));
 
                 defect.setPriority(parsePriority(node.path("priority").asText("P1")));
                 defect.setStatus(Defect.DefectStatus.NEW);
                 defect.setDescription("LLM-triaged defect from execution failures");
+                defect.setAssignedTo(inferOwner(category));
+                defect.setAffectedComponent(inferOwner(category));
+                defect.getTags().add(category.toUpperCase(Locale.ROOT));
+                defect.getTags().add("RISK_BASED_TRIAGE");
 
                 Defect.RootCauseAnalysis rca = new Defect.RootCauseAnalysis();
-                rca.setHypothesis(node.path("hypothesis").asText("Potential application defect in failure path"));
-                rca.setRecommendedInvestigation(node.path("recommendedInvestigation").asText("Inspect logs and API contract mismatches"));
+                rca.setHypothesis(hypothesis);
+                rca.setRecommendedInvestigation(investigation);
                 rca.setConfidence(node.path("confidenceScore").asDouble(0.7));
                 for (JsonNode c : node.path("likelyComponents")) {
                     rca.getLikelyComponents().add(c.asText());
+                }
+                if (rca.getLikelyComponents().isEmpty()) {
+                    rca.getLikelyComponents().add(inferOwner(category));
                 }
                 defect.setRootCauseAnalysis(rca);
                 defect.setConfidenceScore(node.path("confidenceScore").asDouble(0.7));
@@ -84,6 +99,10 @@ public class DefectTriageAgent extends BaseAgent {
                 for (TestExecutionResult failure : failures) {
                     defect.getTestResultIds().add(failure.getResultId());
                 }
+
+                TestExecutionResult sample = failures.get(0);
+                defect.setExpectedBehavior(String.valueOf(sample.getExpectedResult()));
+                defect.setActualBehavior(String.valueOf(sample.getActualResult()));
 
                 defects.add(defect);
             }
@@ -99,30 +118,187 @@ public class DefectTriageAgent extends BaseAgent {
     }
 
     private List<Defect> buildFallbackDefects(List<TestExecutionResult> failures) {
-        List<Defect> defects = new ArrayList<>();
+        Map<String, List<TestExecutionResult>> clusters = new HashMap<>();
         for (TestExecutionResult failure : failures) {
+            String key = clusterKey(failure);
+            clusters.computeIfAbsent(key, k -> new ArrayList<>()).add(failure);
+        }
+
+        List<Defect> defects = new ArrayList<>();
+        for (Map.Entry<String, List<TestExecutionResult>> entry : clusters.entrySet()) {
+            List<TestExecutionResult> cluster = entry.getValue();
+            TestExecutionResult sample = cluster.get(0);
+            String category = inferCategory(sample);
+            Defect.Severity severity = inferSeverity(category, cluster.size());
+
             Defect defect = new Defect(
                 "DEF-" + UUID.randomUUID().toString().substring(0, 8),
-                "Failure in test " + failure.getTestId(),
-                Defect.Severity.HIGH
+                buildTitle(category, sample),
+                severity
             );
-            defect.setPriority(Defect.Priority.P1);
+
+            defect.setPriority(inferPriority(severity));
             defect.setStatus(Defect.DefectStatus.NEW);
-            defect.setDescription(failure.getErrorMessage() == null ? "Execution failure" : failure.getErrorMessage());
-            defect.getTestResultIds().add(failure.getResultId());
+            defect.setDescription(sample.getErrorMessage() == null ? "Execution failure" : sample.getErrorMessage());
+
+            for (TestExecutionResult result : cluster) {
+                defect.getTestResultIds().add(result.getResultId());
+            }
+
+            defect.setAffectedComponent(inferOwner(category));
+            defect.setAssignedTo(inferOwner(category));
+            defect.setExpectedBehavior(String.valueOf(sample.getExpectedResult()));
+            defect.setActualBehavior(String.valueOf(sample.getActualResult()));
+
+            defect.getReproductionSteps().add("Execute generated test: " + sample.getTestId());
+            defect.getReproductionSteps().add("Observe status: " + sample.getStatus());
+            if (sample.getErrorMessage() != null) {
+                defect.getReproductionSteps().add("Error: " + sample.getErrorMessage());
+            }
+
+            if (sample.getStackTrace() != null && !sample.getStackTrace().isBlank()) {
+                defect.getErrorLogs().add(sample.getStackTrace());
+            }
+
+            defect.setFlaky(cluster.stream().anyMatch(TestExecutionResult::isFlaky));
+            defect.setFlakyRate(defect.isFlaky() ? 0.5 : 0.0);
+            defect.setDuplicate(cluster.size() > 1);
+            if (cluster.size() > 1) {
+                defect.getSimilarDefects().add("CLUSTER_SIZE_" + cluster.size());
+            }
+            defect.getTags().add(category.toUpperCase(Locale.ROOT));
+            defect.getTags().add("RISK_BASED_TRIAGE");
 
             Defect.RootCauseAnalysis rca = new Defect.RootCauseAnalysis();
-            rca.setHypothesis("Likely contract/assertion mismatch in tested flow");
-            rca.setRecommendedInvestigation("Review failing assertion and payload contract");
-            rca.setConfidence(0.6);
-            rca.getLikelyComponents().add("Application Service");
+            rca.setHypothesis(buildHypothesis(category, sample));
+            rca.setRecommendedInvestigation(buildInvestigation(category));
+            rca.setConfidence(cluster.size() > 1 ? 0.82 : 0.72);
+            rca.getLikelyComponents().add(inferOwner(category));
+            if ("security".equals(category)) {
+                rca.getLikelyComponents().add("Auth Middleware");
+            }
+            rca.getContributingFactors().add("Scenario type: " + category);
+            rca.getContributingFactors().add("Clustered failures: " + cluster.size());
             defect.setRootCauseAnalysis(rca);
-            defect.setConfidenceScore(0.6);
-            defect.setTriageNotes("Fallback triage used due missing/failed LLM response");
+            defect.setConfidenceScore(cluster.size() > 1 ? 0.82 : 0.72);
+            defect.setTriageNotes("Fallback triage used due missing/failed LLM response. Clustered and owner-assigned automatically.");
 
             defects.add(defect);
         }
         return defects;
+    }
+
+    private String clusterKey(TestExecutionResult failure) {
+        String msg = failure.getErrorMessage() == null ? "execution-failure" : failure.getErrorMessage().toLowerCase(Locale.ROOT);
+        msg = msg.replaceAll("\\d+", "X").replaceAll("[^a-z0-9 ]", " ").replaceAll("\\s+", " ").trim();
+        return inferCategory(failure) + "|" + msg;
+    }
+
+    private String inferCategory(TestExecutionResult failure) {
+        String ref = ((failure.getErrorMessage() == null ? "" : failure.getErrorMessage()) + " " + (failure.getTestId() == null ? "" : failure.getTestId())).toLowerCase(Locale.ROOT);
+        if (ref.contains("auth") || ref.contains("token") || ref.contains("permission") || ref.contains("unauthorized")) {
+            return "security";
+        }
+        if (ref.contains("boundary") || ref.contains("length") || ref.contains("limit") || ref.contains("out of range")) {
+            return "boundary";
+        }
+        if (ref.contains("validation") || ref.contains("required") || ref.contains("format") || ref.contains("assertion")) {
+            return "validation";
+        }
+        return "functional";
+    }
+
+    private String inferCategoryFromText(String text) {
+        String ref = text == null ? "" : text.toLowerCase(Locale.ROOT);
+        if (ref.contains("auth") || ref.contains("token") || ref.contains("permission") || ref.contains("unauthorized") || ref.contains("security")) {
+            return "security";
+        }
+        if (ref.contains("boundary") || ref.contains("length") || ref.contains("limit") || ref.contains("range")) {
+            return "boundary";
+        }
+        if (ref.contains("validation") || ref.contains("required") || ref.contains("format") || ref.contains("schema")) {
+            return "validation";
+        }
+        return "functional";
+    }
+
+    private Defect.Severity inferSeverity(String category, int clusterSize) {
+        if ("security".equals(category)) {
+            return Defect.Severity.CRITICAL;
+        }
+        if (clusterSize >= 3) {
+            return Defect.Severity.HIGH;
+        }
+        if ("functional".equals(category)) {
+            return Defect.Severity.HIGH;
+        }
+        return Defect.Severity.MEDIUM;
+    }
+
+    private Defect.Priority inferPriority(Defect.Severity severity) {
+        switch (severity) {
+            case CRITICAL:
+                return Defect.Priority.P0;
+            case HIGH:
+                return Defect.Priority.P1;
+            case MEDIUM:
+                return Defect.Priority.P2;
+            default:
+                return Defect.Priority.P3;
+        }
+    }
+
+    private String inferOwner(String category) {
+        switch (category) {
+            case "security":
+                return "Security Platform Team";
+            case "validation":
+                return "Validation Service Team";
+            case "boundary":
+                return "API Contract Team";
+            default:
+                return "Core Application Team";
+        }
+    }
+
+    private String buildTitle(String category, TestExecutionResult sample) {
+        String suffix = sample.getTestId() == null ? "cluster" : sample.getTestId();
+        switch (category) {
+            case "security":
+                return "Authorization/Token handling failure in " + suffix;
+            case "validation":
+                return "Input validation defect in " + suffix;
+            case "boundary":
+                return "Boundary condition defect in " + suffix;
+            default:
+                return "Functional failure in " + suffix;
+        }
+    }
+
+    private String buildHypothesis(String category, TestExecutionResult sample) {
+        switch (category) {
+            case "security":
+                return "Authorization checks are missing or incorrectly applied for protected flow.";
+            case "validation":
+                return "Input schema validation is incomplete or inconsistent between layers.";
+            case "boundary":
+                return "Boundary constraints (min/max/length) are not consistently enforced.";
+            default:
+                return "Primary business flow has an assertion/contract mismatch: " + (sample.getErrorMessage() == null ? "unknown" : sample.getErrorMessage());
+        }
+    }
+
+    private String buildInvestigation(String category) {
+        switch (category) {
+            case "security":
+                return "Review auth middleware, token verification, and role-based route guards.";
+            case "validation":
+                return "Compare API schema vs. service-layer validation and add negative regression tests.";
+            case "boundary":
+                return "Inspect min/max constraints and off-by-one checks in validator and persistence layer.";
+            default:
+                return "Review service logs, failing assertions, and contract expectations for affected endpoints.";
+        }
     }
 
     private List<Defect> deduplicateByNormalizedTitle(List<Defect> defects) {

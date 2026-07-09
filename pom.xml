@@ -17,28 +17,13 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <semantic-kernel.version>1.5.0</semantic-kernel.version>
         <junit.version>5.10.0</junit.version>
-        <testng.version>7.8.1</testng.version>
         <jackson.version>2.17.0</jackson.version>
         <okhttp.version>4.11.0</okhttp.version>
         <slf4j.version>2.0.11</slf4j.version>
     </properties>
 
     <dependencies>
-        <!-- Microsoft Semantic Kernel -->
-        <dependency>
-            <groupId>com.microsoft.semantic-kernel</groupId>
-            <artifactId>semantic-kernel-core</artifactId>
-            <version>${semantic-kernel.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.microsoft.semantic-kernel</groupId>
-            <artifactId>semantic-kernel-openai</artifactId>
-            <version>${semantic-kernel.version}</version>
-        </dependency>
-
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -83,13 +68,6 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.testng</groupId>
-            <artifactId>testng</artifactId>
-            <version>${testng.version}</version>
-            <scope>test</scope>
-        </dependency>
-
         <!-- Code Analysis -->
         <dependency>
             <groupId>com.puppycrawl.tools</groupId>

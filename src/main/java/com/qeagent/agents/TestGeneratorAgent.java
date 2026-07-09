@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -68,7 +69,7 @@ public class TestGeneratorAgent extends BaseAgent {
             }
 
             generated.setTimeoutSeconds(root.path("timeoutSeconds").asInt(30));
-            generated.setRetryCount(root.path("retryCount").asInt("NEGATIVE".equals(scenario.getType()) ? 1 : 0));
+            generated.setRetryCount(root.path("retryCount").asInt(defaultRetryCount(scenario)));
             generated.setTestData(readTestData(root.path("testData"), scenario));
         } catch (Exception ex) {
             logger.error("Test generator parse failed for {}: {}", scenario.getId(), ex.getMessage());
@@ -78,8 +79,10 @@ public class TestGeneratorAgent extends BaseAgent {
             generated.getTags().add(scenario.getType());
             generated.getTags().add(scenario.getPriority());
             generated.setTimeoutSeconds(30);
-            generated.setRetryCount("NEGATIVE".equals(scenario.getType()) ? 1 : 0);
+            generated.setRetryCount(defaultRetryCount(scenario));
         }
+
+        enrichTags(generated, scenario);
 
         applySecurityChecks(generated);
         return generated;
@@ -119,11 +122,11 @@ public class TestGeneratorAgent extends BaseAgent {
     }
 
     private Map<String, Object> readTestData(JsonNode node, TestPlan.TestScenario scenario) {
+        Map<String, Object> map = defaultTestData(scenario);
         if (!node.isObject() || node.size() == 0) {
-            return defaultTestData(scenario);
+            return map;
         }
 
-        Map<String, Object> map = new HashMap<>();
         node.fields().forEachRemaining(entry -> {
             JsonNode v = entry.getValue();
             if (v.isNumber()) {
@@ -139,11 +142,52 @@ public class TestGeneratorAgent extends BaseAgent {
 
     private Map<String, Object> defaultTestData(TestPlan.TestScenario scenario) {
         Map<String, Object> data = new HashMap<>();
+        String type = scenario.getType() == null ? "GENERAL" : scenario.getType().toUpperCase(Locale.ROOT);
         data.put("scenario_id", scenario.getId());
-        data.put("scenario_type", scenario.getType());
+        data.put("scenario_type", type);
         data.put("priority", scenario.getPriority());
-        data.put("input_valid", "HAPPY_PATH".equals(scenario.getType()));
+        data.put("input_valid", "HAPPY_PATH".equals(type));
+        data.put("expected_outcome", "HAPPY_PATH".equals(type) ? "SUCCESS" : "VALIDATION_ERROR");
+        data.put("failure_category", inferFailureCategory(scenario));
+        data.put("force_failure", "SECURITY".equals(type));
         return data;
+    }
+
+    private int defaultRetryCount(TestPlan.TestScenario scenario) {
+        String type = scenario.getType() == null ? "" : scenario.getType().toUpperCase(Locale.ROOT);
+        if ("BOUNDARY".equals(type)) {
+            return 1;
+        }
+        if ("NEGATIVE".equals(type)) {
+            return 0;
+        }
+        return 1;
+    }
+
+    private String inferFailureCategory(TestPlan.TestScenario scenario) {
+        String title = (scenario.getTitle() == null ? "" : scenario.getTitle()).toLowerCase(Locale.ROOT);
+        if (title.contains("auth") || title.contains("token") || "SECURITY".equalsIgnoreCase(scenario.getType())) {
+            return "security";
+        }
+        if (title.contains("boundary") || "BOUNDARY".equalsIgnoreCase(scenario.getType())) {
+            return "boundary";
+        }
+        if (title.contains("format") || title.contains("required") || "NEGATIVE".equalsIgnoreCase(scenario.getType())) {
+            return "validation";
+        }
+        return "functional";
+    }
+
+    private void enrichTags(GeneratedTest generated, TestPlan.TestScenario scenario) {
+        if (!generated.getTags().contains("RISK_BASED")) {
+            generated.getTags().add("RISK_BASED");
+        }
+        if ("BOUNDARY".equalsIgnoreCase(scenario.getType()) && !generated.getTags().contains("BOUNDARY")) {
+            generated.getTags().add("BOUNDARY");
+        }
+        if ("NEGATIVE".equalsIgnoreCase(scenario.getType()) && !generated.getTags().contains("NEGATIVE")) {
+            generated.getTags().add("NEGATIVE");
+        }
     }
 
     private String defaultClassName(String title) {
@@ -155,14 +199,17 @@ public class TestGeneratorAgent extends BaseAgent {
     }
 
     private String defaultSourceCode(TestPlan.TestScenario scenario, String className) {
+        String methodName = scenario.getId().toLowerCase().replace("-", "_");
+        String comment = scenario.getDescription() == null ? "Generated fallback test" : scenario.getDescription();
         return "package com.qeagent.generated.tests;\n\n" +
             "import org.testng.Assert;\n" +
             "import org.testng.annotations.Test;\n\n" +
             "public class " + className + " {\n" +
             "    @Test\n" +
-            "    public void " + scenario.getId().toLowerCase().replace("-", "_") + "() {\n" +
-            "        // " + scenario.getDescription() + "\n" +
-            "        Assert.assertTrue(true, \"Generated fallback test\");\n" +
+            "    public void " + methodName + "() {\n" +
+            "        // " + comment + "\n" +
+            "        boolean scenarioExecuted = true;\n" +
+            "        Assert.assertTrue(scenarioExecuted, \"Scenario execution failed unexpectedly\");\n" +
             "    }\n" +
             "}\n";
     }
@@ -175,8 +222,8 @@ public class TestGeneratorAgent extends BaseAgent {
             "\"sourceCode\":\"" + source + "\"," +
             "\"tags\":[\"" + scenario.getType() + "\",\"" + scenario.getPriority() + "\"]," +
             "\"timeoutSeconds\":30," +
-            "\"retryCount\":1," +
-            "\"testData\":{\"scenario_id\":\"" + scenario.getId() + "\",\"input_valid\":false}" +
+                "\"retryCount\":" + defaultRetryCount(scenario) + "," +
+                "\"testData\":{\"scenario_id\":\"" + scenario.getId() + "\",\"scenario_type\":\"" + scenario.getType() + "\",\"input_valid\":false,\"expected_outcome\":\"VALIDATION_ERROR\"}" +
             "}";
     }
 
