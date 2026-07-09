@@ -23,12 +23,9 @@ public class QEBackendServer {
 
     private final HttpServer server;
     private final ObjectMapper mapper;
-    private final QEWorkflowOrchestrator orchestrator;
-
     public QEBackendServer(int port) throws IOException {
         this.server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         this.mapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
-        this.orchestrator = new QEWorkflowOrchestrator();
 
         server.createContext("/health", this::handleHealth);
         server.createContext("/api/workflow", this::handleWorkflow);
@@ -85,6 +82,7 @@ public class QEBackendServer {
             String artifactTypeText = getText(root, "artifactType", "PRD");
             TestPlan.ArtifactType artifactType = parseArtifactType(artifactTypeText);
 
+            QEWorkflowOrchestrator orchestrator = new QEWorkflowOrchestrator();
             ExecutionContext context = orchestrator.executeWorkflow(artifactContent, artifactType);
 
             Map<String, Object> response = new LinkedHashMap<>();
