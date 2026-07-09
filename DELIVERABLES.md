@@ -292,15 +292,15 @@ java -cp target/qe-agent-system.jar com.qeagent.Main
 - ✅ **Confidence scoring** makes uncertainty visible
 
 ### Tradeoffs Made
-- **Heuristics vs. LLM:** Chose heuristics for speed/determinism; can add LLM later
+- **Heuristics + LLM Fallbacks:** Combined live LLM assistance with deterministic fallbacks for resilience, speed, and repeatability
 - **Simulated execution vs. Real:** Chose simulated for demo simplicity; real execution for production
 - **Parallel tests only:** Planning/generation are CPU-bound; parallelizing all stages adds complexity
 - **Regex vs. AST parsing:** Chose regex for speed; catches 95% of patterns
 
 ### Future Enhancements (Roadmap)
-1. **LLM Integration** - Expand prompt-driven planning and triage while preserving deterministic fallbacks
+1. **LLM Quality Tuning** - Add prompt evaluations, model routing, and response-quality benchmarks across planning, generation, and triage
 2. **Real Test Execution** - Docker containers + actual TestNG compilation
-3. **Human-in-the-Loop UI** - Web dashboard for review & approval
+3. **HITL Workflow Hardening** - Expand approvals with richer audit trails, reviewer roles, and stronger governance controls
 4. **Multi-Language** - Python, JavaScript, Go test generation
 5. **Analytics** - Track effectiveness, trends, coverage over time
 
