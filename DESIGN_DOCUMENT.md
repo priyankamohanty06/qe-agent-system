@@ -677,7 +677,6 @@ This QE Agent System demonstrates that intelligent automation can successfully t
 
 ### Documentation
 - [README.md](./README.md) - Usage guide and architecture
-- [Microsoft Semantic Kernel Java](https://github.com/microsoft/semantic-kernel/tree/main/java)
 - [TestNG Framework](https://testng.org/)
 
 ### Security Standards
