@@ -564,12 +564,12 @@ qe-results-1720352145628/
 
 ## 🎨 Design Decisions
 
-### Why Microsoft Semantic Kernel?
-- **Native Java Support:** Excellent built-in Java SDK
-- **Plugin Architecture:** Easy agent composition
-- **LLM Flexibility:** Support for multiple models (OpenAI, Azure OpenAI, etc.)
-- **Memory Management:** Built-in context and semantic memory
-- **Enterprise Ready:** Used by Microsoft internally
+### Why Direct Chat-Completions Invocation?
+- **Provider Flexibility:** The backend can target any compatible chat-completions endpoint through environment variables.
+- **Simple Runtime Model:** HTTP invocation plus JSON parsing keeps the runtime small and easier to debug.
+- **Deterministic Fallback:** If the provider is unavailable or returns invalid output, the workflow still completes end to end.
+- **Transparent Prompts:** Stage-specific prompts are explicit and easy to tune for QE behavior.
+- **Frontend Compatibility:** The same workflow can be consumed by the CLI and the local HTTP server used by the UI demo.
 
 ### Why Java?
 - **Test Framework Compatibility:** Works with TestNG, JUnit, etc.
@@ -715,41 +715,40 @@ Files:
 
 ### What to Build Next
 
-1. **LLM Integration**
-   - Replace hardcoded logic with Semantic Kernel LLM calls
-   - Fine-tune prompts for domain-specific testing
-   - Add prompt versioning/A-B testing
-
-2. **Human-in-the-Loop**
-   - UI for approving/modifying test plans
-   - Defect triage review dashboard
-   - Feedback loop to improve agent prompts
-
-3. **Test Execution Sandbox**
+1. **Richer Test Execution Sandbox**
    - Docker-based test containers
    - Network isolation
    - Resource limits (CPU, memory, disk)
 
-4. **Historical Analytics**
+2. **Historical Analytics**
    - Track defect trends over time
    - Test flakiness patterns
    - Coverage evolution
 
-5. **Multi-Language Support**
+3. **Multi-Language Support**
    - Generate tests in Python, JavaScript, Go, etc.
    - API testing with Postman collections
    - Load testing with k6 scripts
 
-6. **Real System Integration**
+4. **Real System Integration**
    - Connect to actual Jira for defect creation
    - GitHub integration for PR-based testing
    - Slack notifications
+
+5. **Review and Governance UX**
+  - Add UI support for reviewing POST_PLANNING and POST_TRIAGE checkpoints
+  - Capture reviewer comments and approval history
+  - Surface audit metadata from `ExecutionContext.metadata`
+
+6. **Deeper Artifact Support**
+  - Improve parsing for larger API specifications and structured schemas
+  - Add better traceability between artifact requirements and generated tests
+  - Expand quality metrics around coverage and defect usefulness
 
 ---
 
 ## 📚 References
 
-- [Microsoft Semantic Kernel Java](https://github.com/microsoft/semantic-kernel/tree/main/java)
 - [TestNG Framework](https://testng.org/)
 - [OWASP Code Injection Prevention](https://owasp.org/www-community/Injection)
 - [Risk-Based Testing](https://en.wikipedia.org/wiki/Risk-based_testing)
