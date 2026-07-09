@@ -4,7 +4,7 @@
 
 **AI-Powered Quality Engineering Agent System** demonstrates an end-to-end workflow that transforms product artifacts (PRD/API specs) into executable tests, runs them safely, and triages failures into actionable defects.
 
-**Built with:** Microsoft Semantic Kernel (Java) | **Status:** Complete & Demonstrated
+**Built with:** Java 17, Maven, custom agent orchestration, optional chat-completions integration | **Status:** Complete & Demonstrated
 
 ---
 
@@ -89,9 +89,9 @@
   - **Rationale:** Clarity, reusability, independent testing
   - **Trade-off:** vs. monolithic orchestrator (chose clarity)
 
-- **Framework Choice:** Microsoft Semantic Kernel (Java)
-  - **Rationale:** First-class Java support, plugin architecture, LLM flexibility
-  - **Trade-off:** vs. LangChain (chose native Java)
+- **Framework Choice:** Custom Java orchestration with optional LLM provider integration
+  - **Rationale:** Deterministic fallback behavior, direct control over workflow stages, simple backend deployment
+  - **Trade-off:** vs. heavier agent frameworks (chose lower complexity and easier debugging)
 
 - **Safety Layers:** 5 defense layers (input → injection → generation → validation → execution)
   - **Rationale:** Defense-in-depth; assume each layer may fail
@@ -274,7 +274,7 @@ java -cp target/qe-agent-system.jar com.qeagent.Main
 |------|---------|--------|
 | **README.md** | Usage guide, architecture, examples | 1,200 lines |
 | **DESIGN_DOCUMENT.md** | Complete design rationale, evaluation, future work | 1,500 lines |
-| **pom.xml** | Maven configuration with Semantic Kernel deps | 150 lines |
+| **pom.xml** | Maven configuration for the Java backend and build tooling | 150 lines |
 | **Source Code** | 5 models + 4 agents + orchestrator + safety | 2,500 lines |
 
 **Total Documentation:** 2,700+ lines  
@@ -298,7 +298,7 @@ java -cp target/qe-agent-system.jar com.qeagent.Main
 - **Regex vs. AST parsing:** Chose regex for speed; catches 95% of patterns
 
 ### Future Enhancements (Roadmap)
-1. **LLM Integration** - Replace heuristics with fine-tuned Semantic Kernel
+1. **LLM Integration** - Expand prompt-driven planning and triage while preserving deterministic fallbacks
 2. **Real Test Execution** - Docker containers + actual TestNG compilation
 3. **Human-in-the-Loop UI** - Web dashboard for review & approval
 4. **Multi-Language** - Python, JavaScript, Go test generation
