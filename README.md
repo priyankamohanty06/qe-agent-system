@@ -1,8 +1,8 @@
 # AI-Powered QE Agent System
 
-**Enterprise-Grade Quality Engineering Automation using Microsoft Semantic Kernel & Java**
+**Quality Engineering workflow service in Java with CLI mode, HTTP server mode, deterministic fallback logic, and frontend-demo integration**
 
-This project demonstrates an intelligent, end-to-end QE workflow that transforms product artifacts (PRDs, API specs) into test plans, executable tests, execution results, and actionable defects—all with built-in safety, sandbox protection, and prompt injection detection.
+This project demonstrates an end-to-end QE workflow that transforms product artifacts such as PRDs, API specs, and user stories into test plans, generated tests, execution results, and actionable defects. It supports both direct CLI execution and a lightweight HTTP backend that powers the companion frontend demo UI.
 
 ## 🎯 Quick Start
 
@@ -26,6 +26,38 @@ java -cp target/qe-agent-system.jar com.qeagent.Main
 ```
 
 **Output:** Complete workflow execution with test plan, generated tests, execution results, and defect triage.
+
+### Backend Server Mode
+
+Run the workflow as a local backend on port `8081`:
+
+```bash
+mvn -DskipTests compile
+java -cp target/classes com.qeagent.Main --server 8081
+```
+
+Available endpoints:
+- `GET /health`
+- `POST /api/workflow`
+
+Default local URL:
+- `http://127.0.0.1:8081`
+
+This mode is intended for the companion UI demo page that invokes the backend and shows connection health, LLM settings, and HITL controls.
+
+### Sample Workflow Request
+
+```json
+{
+  "artifactContent": "As a student, I want to update my profile so that my contact details stay accurate.",
+  "artifactType": "USER_STORY"
+}
+```
+
+Successful responses include:
+- `executionContext`
+- `plan`
+- `triageDefects`
 
 ### LLM Configuration (Real Invocation)
 
@@ -104,6 +136,16 @@ Checkpoint decisions are persisted in `ExecutionContext.metadata` under keys lik
 
 ## 📋 System Architecture
 
+### Runtime Modes
+- CLI mode: runs the full workflow locally and writes JSON outputs to disk.
+- HTTP server mode: exposes the workflow over REST for the frontend demo UI.
+
+### HTTP Layer
+- `QEBackendServer` wraps the orchestrator using JDK `HttpServer`.
+- CORS is enabled for local browser-based access.
+- `Main.java` supports `--server [port]` startup.
+- Responses are returned as JSON containing `executionContext`, `plan`, and `triageDefects`.
+
 ### 4-Stage QE Agent Workflow
 
 ```
@@ -166,7 +208,7 @@ Checkpoint decisions are persisted in `ExecutionContext.metadata` under keys lik
 ```
 qe-agent-system/
 ├── src/main/java/com/qeagent/
-│   ├── Main.java                           # CLI entry point
+│   ├── Main.java                           # CLI entry point + server mode
 │   ├── models/
 │   │   ├── TestPlan.java                  # Test plan data model
 │   │   ├── GeneratedTest.java             # Generated test model
@@ -180,6 +222,8 @@ qe-agent-system/
 │   │   └── DefectTriageAgent.java         # Stage 4: Triaging
 │   ├── orchestration/
 │   │   └── QEWorkflowOrchestrator.java    # Workflow coordinator
+│   ├── server/
+│   │   └── QEBackendServer.java           # /health and /api/workflow endpoints
 │   └── safety/
 │       ├── CodeSanitizer.java             # Code injection prevention
 │       └── PromptInjectionDetector.java   # Prompt injection detection
@@ -211,6 +255,12 @@ qe-agent-system/
 - Flagged ambiguities
 - Test data requirements
 
+Recent quality improvements:
+- Stronger fallback planning for user stories and API specs
+- Better snake_case/camelCase hydration handling from model output
+- Minimum plan-quality enforcement so thin model output is replaced with richer deterministic risk coverage
+- Security signal detection for phrases such as `logged in`, token, role, and permission
+
 **Example Risks Detected:**
 - Payment processing → CRITICAL priority
 - Authentication → CRITICAL priority  
@@ -240,6 +290,11 @@ qe-agent-system/
 - Test data
 - Security check results
 - Sanitization status
+
+Recent quality improvements:
+- Scenario metadata now carries expected outcome and failure category
+- Tags are enriched for risk-based, negative, and boundary coverage
+- Retry defaults are tuned by scenario type for more realistic execution behavior
 
 **Security Checks Performed:**
 ```
@@ -278,6 +333,11 @@ qe-agent-system/
 - Test fails on attempt 1 → Retry
 - Test passes on attempt 2 → Mark as FLAKY
 - Helps identify environmental issues vs. true defects
+
+Recent quality improvements:
+- Deterministic failure behavior is aligned to scenario type
+- Negative-path and security-path failures produce more meaningful triage input
+- Boundary and happy-path behavior remain predictable for demo repeatability
 
 ---
 
@@ -335,6 +395,11 @@ qe-agent-system/
 - Duplicate clustering
 - Confidence score (0.0-1.0)
 - Triage notes with reasoning
+
+Recent quality improvements:
+- Fallback triage clusters failures into actionable defects
+- Owner/component, severity, priority, expected vs actual behavior, and RCA hints are now populated consistently
+- LLM-parsed defects are normalized so owner metadata still exists even with sparse model output
 
 **Example Defect:**
 ```json

@@ -177,7 +177,7 @@ mvn clean package
 - Try: `mvn clean install` (instead of package)
 - Clear Maven cache: `rm -rf ~/.m2/repository` (macOS/Linux) or `rmdir %USERPROFILE%\.m2\repository` (Windows)
 
-### Step 3: Run the Demo
+### Step 3: Run the Demo (CLI Mode)
 
 ```bash
 # Run the QE Agent System
@@ -210,7 +210,43 @@ Files:
 
 **Execution time:** ~2-3 seconds
 
-### Step 4: View Results
+### Step 4: Run as Local Backend Service
+
+If you want to connect the frontend UI to the Java backend, start server mode on port `8081`.
+
+```bash
+mvn -DskipTests compile
+java -cp target/classes com.qeagent.Main --server 8081
+```
+
+**Expected output:**
+```
+QE backend server is running on http://127.0.0.1:8081
+```
+
+**Available endpoints:**
+- `GET /health`
+- `POST /api/workflow`
+
+**Health check example:**
+```bash
+curl http://127.0.0.1:8081/health
+```
+
+**Workflow request example:**
+```bash
+curl -X POST http://127.0.0.1:8081/api/workflow \
+   -H "Content-Type: application/json" \
+   -d '{"artifactContent":"As a student, I want to update my profile","artifactType":"USER_STORY"}'
+```
+
+**Frontend integration:**
+- Start the companion UI from the frontend repository.
+- Open the backend-connected page.
+- Use `http://127.0.0.1:8081` as the backend URL.
+- Confirm the UI health badge reports a connected backend.
+
+### Step 5: View Results
 
 **List output files:**
 ```bash
@@ -249,6 +285,22 @@ type qe-results-*\execution-context.json
 ---
 
 ## 🔧 Advanced Configuration
+
+### LLM and HITL environment variables
+
+PowerShell example:
+
+```powershell
+$env:QE_LLM_API_KEY = "DUMMY_API_KEY"
+$env:QE_LLM_MODEL = "openai/gpt-4o-mini"
+$env:QE_LLM_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+$env:QE_HITL_MODE = "advisory"
+$env:QE_HITL_APPROVAL_TOKEN = ""
+```
+
+Notes:
+- `QE_HITL_MODE=enforced` stops the workflow unless `QE_HITL_APPROVAL_TOKEN=APPROVED`.
+- With a dummy API key, the system still completes end to end using deterministic local fallback logic.
 
 ### Custom Logging
 

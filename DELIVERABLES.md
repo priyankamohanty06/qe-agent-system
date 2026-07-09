@@ -12,10 +12,12 @@
 
 ### 1. ✅ Running Demo
 - **Location:** `src/main/java/com/qeagent/Main.java`
-- **Run:** `mvn clean package && java -cp target/qe-agent-system.jar com.qeagent.Main`
-- **Output:** Complete workflow execution with colorized console output + JSON result files
+- **Run (CLI):** `mvn clean package && java -cp target/qe-agent-system.jar com.qeagent.Main`
+- **Run (HTTP server):** `mvn -DskipTests compile && java -cp target/classes com.qeagent.Main --server 8081`
+- **Output:** Complete workflow execution with colorized console output + JSON result files, or JSON API responses in server mode
 - **Time:** ~2-3 seconds end-to-end
 - **Demo Artifact:** Sample PRD (User Authentication API v2.0) included
+- **UI Pairing:** Companion frontend can call `http://127.0.0.1:8081/api/workflow`
 
 ### 2. ✅ Source Code (Java)
 - **Language:** Java 17+
@@ -37,6 +39,8 @@
   │   └── DefectTriageAgent.java (Stage 4)
   ├── orchestration/
   │   └── QEWorkflowOrchestrator.java
+  ├── server/
+  │   └── QEBackendServer.java
   └── safety/
       ├── CodeSanitizer.java
       └── PromptInjectionDetector.java
@@ -48,9 +52,11 @@
 - **Location:** `README.md`
 - **Sections:**
   - Quick start (clone → build → run)
+  - CLI mode and backend server mode
+  - REST endpoints and frontend integration
   - Architecture overview with ASCII diagrams
   - Project structure
-  - Detailed workflow stages (4 pages)
+  - Detailed workflow stages and current quality-improvement behavior
   - Safety & security deep-dive
   - Evaluation metrics & results
   - Design decisions with tradeoffs

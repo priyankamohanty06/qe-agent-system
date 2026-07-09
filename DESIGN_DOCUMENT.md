@@ -1,7 +1,7 @@
 # DESIGN DOCUMENT: AI-Powered QE Agent System
 
-**Version:** 1.0  
-**Date:** July 9, 2026 
+**Version:** 1.1  
+**Date:** July 9, 2026  
 **Author:** Priyanka Mohanty  
 **Status:** Complete & Demonstrated
 
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-This document describes the design, implementation, and evaluation of an AI-powered Quality Engineering (QE) agent system that automates the complete testing lifecycle: artifact analysis -> test planning -> test generation -> execution -> defect triage. The system is built in Java and uses real chat-completions LLM invocation for planning, generation, and triage stages, with deterministic fallback mode when secrets or provider access are unavailable.
+This document describes the design, implementation, and evaluation of an AI-powered Quality Engineering (QE) agent system that automates the complete testing lifecycle: artifact analysis -> test planning -> test generation -> execution -> defect triage. The system is built in Java and supports both CLI execution and HTTP backend service mode for the companion UI. Planning, generation, and triage can use real chat-completions invocation, with deterministic fallback mode when secrets or provider access are unavailable.
 
 **Key Achievement:** End-to-end workflow demonstrating all 4 QE stages with real LLM-backed reasoning and resilient fallback execution.
 
@@ -72,6 +72,13 @@ Quality Engineering is a high-leverage place to apply agentic AI:
             │ • Timeout Mgmt │  │ • File System  │
             │ • Retry Logic  │  │                │
             └────────────────┘  └────────────────┘
+
+                  ┌────────────────┐
+                  │ HTTP Service   │
+                  │ • /health      │
+                  │ • /api/workflow│
+                  │ • CORS enabled │
+                  └────────────────┘
 ```
 
 ### 2.2 Component Responsibilities
@@ -85,6 +92,14 @@ Quality Engineering is a high-leverage place to apply agentic AI:
 - Apply human-in-the-loop checkpoints at critical decision stages
 - Handle errors gracefully with fallbacks
 - Coordinate cleanup (thread pool shutdown, etc.)
+
+#### QEBackendServer
+**Role:** Lightweight REST wrapper around the orchestrator  
+**Responsibilities:**
+- Expose health and workflow endpoints for the browser demo
+- Parse `artifactContent` and `artifactType` request payloads
+- Return compact JSON containing `executionContext`, `plan`, and `triageDefects`
+- Allow local CORS access from the frontend demo pages
 
 **Key Methods:**
 ```java
@@ -139,6 +154,7 @@ private boolean humanReviewCheckpoint(...)
 - Improves risk reasoning and ambiguity detection quality
 - Keeps demo and local runs reliable with no mandatory secret dependency
 - Maintains provider portability using configurable endpoint/model
+- Adds deterministic quality fallback when model output is incomplete
 
 #### TestGeneratorAgent (Stage 2)
 **Role:** Convert test scenarios into executable code  
@@ -167,6 +183,9 @@ private boolean humanReviewCheckpoint(...)
 | Safe Files | `new File()`, write ops | WARN |
 | SQL Safe | Concatenation without `PreparedStatement` | WARN |
 
+Recent refinement:
+- Generated metadata now carries scenario type, expected outcome, failure category, and richer retry defaults so downstream execution and triage are more meaningful.
+
 #### TestExecutorAgent (Stage 3)
 **Role:** Run tests in sandboxed environment  
 **Input:** List<GeneratedTest>  
@@ -192,6 +211,9 @@ private boolean humanReviewCheckpoint(...)
 - **Detection:** If test FAILS on attempt 1, PASSES on attempt 2 → FLAKY
 - **Benefit:** Prevents noisy defects from timing/environment issues
 - **Threshold:** Configurable retry count (default 2)
+
+Recent refinement:
+- Execution uses deterministic scenario-aware failure rules so negative, boundary, and security tests provide repeatable triage signals instead of random noise.
 
 #### DefectTriageAgent (Stage 4)
 **Role:** Analyze failures and create actionable defects  
@@ -224,6 +246,10 @@ Confidence Calculation:
   + RCA confidence * 0.1
   = min(0.95, total)
 ```
+
+Recent refinement:
+- Fallback triage assigns ownership, affected component, dedupe context, likely RCA, and expected/actual behavior.
+- LLM-parsed defects are normalized so owner/component metadata is still populated even with thin model responses.
 
 ### 2.3 Data Flow
 
