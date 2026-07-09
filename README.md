@@ -542,20 +542,35 @@ When you run the demo, outputs are saved to `qe-results-{timestamp}/`:
 
 ```
 qe-results-1720352145628/
-├── execution-context.json    # Complete workflow state
+├── execution-context.json    # Complete workflow state across all 4 stages
 ├── test-plan.json            # Generated test plan
-└── defects.json              # Triaged defects
+└── defects.json              # Triaged defects (written only when failures produce defects)
 ```
+
+Notes:
+- `execution-context.json` is always written.
+- `test-plan.json` is written when planning completes successfully.
+- `defects.json` is only written when `triageDefects` is non-empty.
+- There are no separate `generated-tests.json` or `execution-results.json` files in the current CLI implementation; both are embedded inside `execution-context.json`.
 
 ### Sample execution-context.json
 ```json
 {
   "contextId": "123e4567-e89b-12d3-a456-426614174000",
+  "productArtifact": "PRODUCT REQUIREMENT DOCUMENT ...",
   "status": "COMPLETED",
+  "createdAt": 1720352145628,
+  "completedAt": 1720352147962,
   "testPlan": { ... },
   "generatedTests": [ ... ],
   "executionResults": [ ... ],
   "triageDefects": [ ... ],
+  "metadata": {
+    "hitl.post_planning.mode": "advisory",
+    "hitl.post_planning.decision": "ADVISORY_AUTO_CONTINUE",
+    "hitl.post_triage.mode": "advisory",
+    "hitl.post_triage.decision": "ADVISORY_AUTO_CONTINUE"
+  },
   "errorLog": []
 }
 ```
