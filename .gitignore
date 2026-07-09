@@ -1,0 +1,6 @@
+target/
+qe-results-*/
+build.log
+build.err.log
+push.log
+dependency-reduced-pom.xml
