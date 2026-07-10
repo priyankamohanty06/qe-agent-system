@@ -150,7 +150,7 @@ Checkpoint decisions are persisted in `ExecutionContext.metadata` under keys lik
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Product Artifact (PRD/API Spec)              │
+│                    Product Artifact (PRD/API Spec/User story)              │
 └────────────────────┬────────────────────────────────────────────┘
                      ↓
           ┌──────────────────────┐
