@@ -2,7 +2,7 @@
 
 ## 📦 Project Overview
 
-**AI-Powered Quality Engineering Agent System** demonstrates an end-to-end workflow that transforms product artifacts (PRD/API specs) into executable tests, runs them safely, and triages failures into actionable defects.
+**AI-Powered Quality Engineering Agent System** demonstrates an end-to-end workflow that transforms product artifacts (PRD/API specs/User story) into executable tests, runs them safely, and triages failures into actionable defects.
 
 **Built with:** Java 17, Maven, custom agent orchestration, optional chat-completions integration | **Status:** Complete & Demonstrated
 
